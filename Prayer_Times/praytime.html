@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Prayer Times Widget</title>
+<style>
+  body {
+    margin:0;
+    height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    background:#eee;
+    font-family: "Georgia", serif;
+  }
+  .widget {
+    width:320px;
+    height:500px;
+    border-radius:20px;
+    overflow:hidden;
+    color:white;
+    text-align:center;
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+    background:url('Masjid.jpg') center/cover no-repeat; 
+    box-shadow:0 8px 25px rgba(0,0,0,0.3);
+    padding:20px;
+  }
+  .header {
+    font-size:14px;
+    margin-top:10px;
+    line-height:1.5;
+  }
+  .prayers {
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    gap:10px;
+  }
+  .prayer {
+    display:flex;
+    justify-content:space-between;
+    padding:8px 15px;
+    background:rgba(255,255,255,0.2);
+    border-radius:20px;
+    font-size:16px;
+    font-weight:500;
+  }
+  .footer {
+    font-size:13px;
+    margin-bottom:10px;
+    line-height:1.5;
+  }
+</style>
+</head>
+<body>
+
+<div class="widget">
+  <div class="header" id="location">Loading...</div>
+  <div class="prayers" id="prayers"></div>
+  <div class="footer" id="dates"></div>
+</div>
+
+<audio id="azan" src="https://cdn.islamic.network/audio/adhan.mp3"></audio>
+
+<script>
+async function loadTimes(){
+  // تحديد الموقع
+  let pos = await new Promise((res,rej)=>navigator.geolocation.getCurrentPosition(res,rej));
+  let lat = pos.coords.latitude, lon = pos.coords.longitude;
+
+  // مواقيت الصلاة (Umm al-Qura)
+  let resp = await fetch(`https://api.aladhan.com/v1/timings?latitude=${lat}&longitude=${lon}&method=4`);
+  let data = await resp.json();
+  let times = data.data.timings;
+  let dateG = data.data.date.gregorian;
+  let dateH = data.data.date.hijri;
+
+  // جلب اسم المدينة + الدولة
+  let locResp = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`);
+  let locData = await locResp.json();
+
+  let address = locData.address;
+  let city = address.city || address.town || address.village || address.municipality || address.state || "Unknown City";
+  let country = address.country || "Unknown Country";
+
+  // عرض في الهيدر
+  document.getElementById("location").innerHTML = `${city}<br>${country}`;
+
+
+  // ترتيب الصلوات
+  let order = ["Fajr","Sunrise","Dhuhr","Asr","Maghrib","Isha"];
+  let html="";
+  order.forEach(p=>{
+    html+=`<div class="prayer"><span>${p}</span><span>${times[p]}</span></div>`;
+  });
+  document.getElementById("prayers").innerHTML=html;
+
+  // التاريخ
+  document.getElementById("dates").innerHTML = 
+    `${dateH.day} ${dateH.month.en}, ${dateH.year}h<br>
+     ${dateG.weekday.en}, ${dateG.date}`;
+
+  // تنبيه الأذان
+  setInterval(()=>{
+    let now = new Date();
+    let current = now.getHours().toString().padStart(2,'0')+":"+now.getMinutes().toString().padStart(2,'0');
+    for(let p in times){
+      if(times[p].startsWith(current)){
+        document.getElementById("azan").play();
+      }
+    }
+  },60000);
+}
+loadTimes();
+</script>
+</body>
+</html>
